@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TAR.10.1.3. - Ticaret Yolu Haritası</title>
+  <meta name="author" content="Cresas-Emre">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f8f8f8;
+    }
+
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+
+    .city-label {
+      color: red;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 80px;
+      font-size : 15px;
+    }
+
+    .city-label:hover {
+      font-size: 15px;
+      transform: scale(1.1);
+    }
+
+    .city-name {
+      order: 1;
+      margin-bottom: 2px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+      background: rgba(255,255,255,0.7);
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+   .city-image {
+  order: 2;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px; /* PC'de kare/köşeli - eskisi gibi */
+  margin: 2px auto;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid #B8860B;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  overflow: hidden;
+  object-fit: contain;
+
+}
+
+    /* Konya özel konumlandırması */
+    .city-label-konya .city-image {
+      transform: translate(0px, -3px); /* Sağa 8px, yukarı 3px */
+	  color : red;
+    }
+	 .city-label-konya .city-name {
+      font-size : 14px;
+	  color : red;
+    }
+	
+
+    /* Alanya özel konumlandırması */
+    .city-label-alanya .city-name {
+      transform: translate(13px, 2px); /* Sağa 3px, aşağı 2px */
+	  color : red;
+	  font-size : 15px;
+    }
+
+    /* Scroll Göstergesi (Ok) Stilleri */
+    .scroll-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+         background: rgb(50, 205, 50);
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 1000;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    .leaflet-popup-content {
+      font-size: 16px;
+      line-height: 1.5;
+      max-width: 320px;
+      text-align: left;
+      background: #fefefe;
+    }
+
+    .leaflet-popup-content strong {
+      color: #8B4513;
+      font-size: 18px;
+      display: block;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #B8860B;
+      padding-bottom: 5px;
+    }
+
+    .leaflet-popup-content img {
+      width: 100%;
+      max-width: 300px;
+      height: auto;
+      border-radius: 8px;
+      margin: 10px 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .trade-route-legend {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.95);
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+      z-index: 1000;
+      font-size: 14px;
+      border: 2px solid #B8860B;
+    }
+
+    .legend-title {
+      font-weight: bold;
+      color: #8B4513;
+      margin-bottom: 10px;
+      text-align: center;
+      font-size: 16px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin: 5px 0;
+    }
+
+    .legend-line {
+      width: 30px;
+      height: 3px;
+      margin-right: 10px;
+      border-radius: 2px;
+    }
+	
+    .bottom-bar {
+      width: 100%;
+      height: 1.2rem;
+      background-color: #ffffff;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      z-index: 9999;
+    }
+
+    .silk-road { background: #DC143C; }
+    .local-trade { background: #FF8C00; }
+    .sea-route { background: #4169E1; }
+    .alanya-tebriz-route { background: #228B22; }
+    .curved-route { background: #32CD32; }
+
+    /* Mobil responsive */
+    @media (max-width: 768px) {
+      .scroll-indicator {
+        top: 15px;
+        right: 15px;
+        width: 35px;
+        height: 35px;
+        font-size: 14px;
+      }
+
+      .trade-route-legend {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        right: 10px;
+        font-size: 12px;
+        padding: 10px;
+      }
+      
+      .legend-title {
+        font-size: 14px;
+      }
+      
+      .city-label {
+        font-size: 14px;
+        padding: 2px 4px;
+        min-width: 70px;
+        z-index: 9999 !important; 
+      }
+	  
+      .city-name {
+        font-size: 13px;
+        padding: 1px 4px;
+        margin-bottom: 3px;
+      }
+        
+      .city-title {
+        z-index: 9999 !important; 
+      }
+      
+      .city-image {
+        width: 28px;
+        height: 28px;
+        margin-top: 1px;
+        border-radius: 50%; /* Mobilde de yuvarlak */
+        overflow: hidden;
+      }
+
+      /* Mobilde Konya özel konumlandırması */
+  
+    .city-label-konya .city-image {
+      transform: translate(5px, -10px); /* Sağa 8px, yukarı 3px */
+	  color : red;
+    }
+	 .city-label-konya .city-name {
+	  transform: translate(10px, -5px); /* Sağa 8px, yukarı 3px */
+      font-size : 13px;
+	  color : red;
+    }
+
+      /* Mobilde Alanya özel konumlandırması */
+      .city-label-alanya .city-name {
+         transform: translate(25px, 2px); /* Sağa 3px, aşağı 2px */
+	  color : red;
+	  font-size : 13px;
+		
+      }
+      
+      .leaflet-popup-content {
+        font-size: 14px;
+        max-width: 280px;
+      }
+      
+      .leaflet-popup-content strong {
+        font-size: 16px;
+      }
+	  
+      .bottom-bar {
+        width: 100%;
+        height: 2rem;
+        background-color: #ffffff;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        z-index: 9999;
+      }
+	
+      .trade-route-legend {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  
+  <!-- Scroll Göstergesi (Ok) -->
+  <div id="scroll-indicator" class="scroll-indicator">
+    ➤
+  </div>
+  
+  <div class="trade-route-legend">
+    <div class="legend-title">🛤️ Ticaret Yolları</div>
+	<!--
+    <div class="legend-item">
+      <div class="legend-line silk-road"></div>
+      <span>İpek Yolu Ana Hat</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-line local-trade"></div>
+      <span>Bölgesel Ticaret</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-line sea-route"></div>
+      <span>Deniz Ticareti</span>
+    </div>
+	-->
+    <div class="legend-item">
+      <div class="legend-line curved-route"></div>
+      <span>Kervan Yolu</span>
+    </div>
+  </div>
+  
+    <div class="bottom-bar"></div>
+
+
+  <script>
+    // Responsive minZoom ayarları
+    var isMobile = window.innerWidth < 768;
+    var responsiveMinZoom = isMobile ? 5.3 : 5.8;
+    var responsiveZoom = isMobile ? 5 : 6;
+    var responsiveSetViewZoom = isMobile ? 5 : 6;
+    
+    // Responsive maxBounds ayarları - Mobilde daha geniş alan
+    var responsiveMaxBounds = isMobile ? [
+      [28, 22],  // Sol-alt köşe (daha batıya genişletildi)
+      [56, 52]   // Sağ-üst köşe (daha doğuya genişletildi)
+    ] : [
+      [28, 25],  // Masaüstü için orijinal
+      [56, 48]
+    ];
+
+    // Beyaz, minimal harita katmanı
+    var map = L.map('map', {
+      minZoom: responsiveMinZoom,
+      maxZoom: 10,
+      zoom: responsiveZoom,
+      zoomSnap: 0.25,
+      worldCopyJump: false,
+     maxBounds: responsiveMaxBounds
+    }).setView([38.5, 35.2], responsiveSetViewZoom);
+
+    // Beyaz, şehir isimsiz minimal harita katmanı gönderilen ref'e uygun
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 20
+    }).addTo(map);
+
+    // Şehirler verisi - YENİ GÜZERGAH DAHİL
+  var cities = [
+      {
+        name: 'Konya',
+        lat: 37.8746,
+        lng: 32.4932,
+        description: 'Türkiye Selçuklularının başkenti Konya birçok ülke tüccarlarının en önemli uğrak merkeziydi. Alanya-Tebriz kıvrımlı yolunun önemli bir durağıdır.',
+        image: 'konya-zazadin.jpg'
+      },
+      {
+        name: 'Sinop',
+        lat: 42.0231,
+        lng: 35.1531,
+        description: 'Buradan çıkarılan bakır ve elde edilen keresteler birçok ülkeye ihraç edilirdi. Ayrıca şehirde yetişen atlar gerek tüccarların gerekse bölge halkının ilgisi çekmekteydi.',
+        image: 'Sinop.jpg'
+      },
+      {
+        name: 'Antalya',
+        lat: 36.8841,
+        lng: 30.7056,
+        description: 'Bölgede çıkarılan keresteler işlenerek deniz yolu ile birçok ülkeye ihraç edilirdi. Alanya yolunun kıvrım noktasıdır.',
+        image: 'Antalya.jpg'
+      },
+      {
+        name: 'Alanya',
+        lat: 36.5444,
+        lng: 32.0000,
+        description: 'Alanya limanından çıkan kervanlar, önce batıya Antalya yönüne kıvrılıp sonra Konya üzerinden doğuya doğru Tebriz\'e uzanan kıvrımlı yolda ticaret yapmışlardır.',
+        image: 'Alanya.jpg'
+      },
+
+      {
+        name: 'Ayıntap (Antep)',
+        lat: 37.0662,
+        lng: 37.3833,
+        description: 'İpek Yolu\'nun önemli güzergâh noktalarından biri olan şehir Anadolu ile Halep arasında önemli bir ticari merkez konumundadır.',
+        image: 'antep.jpg'
+      },
+      {
+        name: 'Musul',
+        lat: 36.3350,
+        lng: 43.1189,
+        description: 'Irak sınırları içerisinde yer alan bu önemli ticaret şehrinden Selçuklular kumaş ve baharat ithal etmişlerdir.',
+        image: 'musul.jpg'
+      },
+      {
+        name: 'Kütahya',
+        lat: 39.4167,
+        lng: 29.9833,
+        description: 'Şehirde çıkarılan gümüş madenleri işlenerek birçok ülkeye ihraç edilirdi.',
+        image: 'Antalya-Isparta-Edvir.jpg'
+      },
+      {
+        name: 'Diyarbakır',
+        lat: 37.9144,
+        lng: 40.2306,
+        description: 'Şehirde çıkarılan bakır madenleri birçok ülkeye ihraç edilirdi.',
+        image: 'diyarbakır.jpg'
+      },
+      {
+        name: 'Erzurum',
+        lat: 39.9208,
+        lng: 41.2675,
+        description: 'Dericilik, dokumacılık, demircilik gibi sanayi kollarına ait ürünler birçok ülkeye ihraç edilirdi. Alanya-Tebriz hattının son Anadolu durağıdır.',
+        image: 'Antalya-Isparta-Edvir.jpg'
+      },
+      {
+        name: 'Sivas',
+        lat: 39.7477,
+        lng: 37.0179,
+        description: 'Demir ve demir sanayine bağlı işlenen birçok ürün farklı ülkelere ihraç edilirdi.',
+        image: 'sivas.jpg'
+      },
+      {
+        name: 'Ankara',
+        lat: 39.9334,
+        lng: 32.8597,
+        description: 'Şehrin en önemli ürünlerinden olan sof kumaşları birçok ülkeye ihraç edilirdi.',
+        image: 'konya-zazadin.jpg'
+      },
+      {
+        name: 'Tebriz',
+        lat: 38.0800,
+        lng: 46.2919,
+        description: 'İran\'ın kuzeybatısında yer alan Tebriz, İpek Yolu\'nun önemli duraklarından biriydi. Alanya\'dan başlayan kıvrımlı ticaret yolunun hedef noktasıdır.',
+        image: 'tebriz.jpg'
+      }
+    ];
+    
+    // Şehir bazında özel konumlandırma ayarları
+    var cityPositioning = {
+      'Konya': {
+        desktop: { iconSize: [90, 70], iconAnchor: [40, 35] },
+        mobile: { iconSize: [90, 70], iconAnchor: [35, 30] },
+        customClass: 'city-label-konya'
+      },
+      'Alanya': {
+        desktop: { iconSize: [90, 70], iconAnchor: [35, 25] },
+        mobile: { iconSize: [90, 70], iconAnchor: [30, 20] },
+        customClass: 'city-label-alanya'
+      },
+      'default': {
+        desktop: { iconSize: [90, 70], iconAnchor: [45, 35] },
+        mobile: { iconSize: [90, 70], iconAnchor: [45, 35] },
+        customClass: 'city-label'
+      }
+    };
+
+    // Scroll Göstergesi Kontrol Fonksiyonu
+    function checkScrollIndicator() {
+      var bounds = map.getBounds();
+      var eastBound = bounds.getEast();
+      
+      var easternCities = [
+        { name: 'Tebriz', lng: 46.2919 },
+        { name: 'Bakü', lng: 49.8671 },
+        { name: 'Gəncə', lng: 46.3606 }
+      ];
+      
+      var shouldShow = false;
+      for (var i = 0; i < easternCities.length; i++) {
+        if (easternCities[i].lng > eastBound) {
+          shouldShow = true;
+          break;
+        }
+      }
+      
+      var indicator = document.getElementById('scroll-indicator');
+      if (shouldShow && window.innerWidth <= 768) {
+        indicator.style.display = 'flex';
+      } else {
+        indicator.style.display = 'none';
+      }
+    }
+
+    // Şehir markerları ekliyorum (özel konumlandırmalı versiyon)
+    cities.forEach(function(city) {
+      var positioning = cityPositioning[city.name] || cityPositioning['default'];
+      var currentPos = isMobile ? positioning.mobile : positioning.desktop;
+      
+      var cityIcon = L.divIcon({
+        className: positioning.customClass,
+        html: '<div class="city-name">' + city.name + '</div>' +
+              '<div class="city-image" style="background-image: url(\'' + city.image + '\')"></div>',
+        iconSize: currentPos.iconSize,
+        iconAnchor: currentPos.iconAnchor
+      });
+
+      var marker = L.marker([city.lat, city.lng], {icon: cityIcon}).addTo(map);
+      
+      var popupContent = '<strong>' + city.name + '</strong><br>' + 
+                        '<img src="' + city.image + '" alt="' + city.name + '" onerror="this.style.display=\'none\'">' +
+                        '<p>' + city.description + '</p>';
+                        
+      marker.bindPopup(popupContent, {
+        maxWidth: 320,
+        className: 'custom-popup'
+      });
+    });
+
+    // Mevcut ticaret yolları kaldırıldı
+    // (Sivas-Antep, Konya-Antep, Erzurum-Musul çizgileri kaldırıldı)
+
+    // KIVIRIMLI ALANYA-TEBRİZ TİCARET YOLU
+    // Güzergah: Alanya → (sola kıvrılarak Antalya'ya doğru) → Konya → Kayseri → Erzincan → Erzurum → Tebriz
+    
+    function createAdvancedCurvedRoute(waypoints, segments) {
+      var allPoints = [];
+      
+      for (var seg = 0; seg < segments.length; seg++) {
+        var segment = segments[seg];
+        var start = waypoints[segment.start];
+        var end = waypoints[segment.end];
+        var curve = segment.curve || 0;
+        var numPoints = segment.points || 20;
+        
+        for (var i = 0; i <= numPoints; i++) {
+          var t = i / numPoints;
+          
+          // Temel interpolasyon
+          var lat = start[0] + (end[0] - start[0]) * t;
+          var lng = start[1] + (end[1] - start[1]) * t;
+          
+          // Eğri ekleme
+          if (curve !== 0) {
+            var perpendicular = Math.sin(t * Math.PI) * curve;
+            // Dikey offset hesaplama
+            var dx = end[1] - start[1];
+            var dy = end[0] - start[0];
+            var length = Math.sqrt(dx * dx + dy * dy);
+            if (length > 0) {
+              lat += (-dx / length) * perpendicular;
+              lng += (dy / length) * perpendicular;
+            }
+          }
+          
+          allPoints.push([lat, lng]);
+        }
+      }
+      
+      return allPoints;
+    }
+
+    // Waypoint'ler (yeni güzergah)
+    var waypoints = [
+      [36.5444, 32.0000], // 0: Alanya
+      [36.8841, 30.7056], // 1: Antalya
+      [37.7200, 31.2400], // 2: Isparta-Beydişehir arası (yön için)
+      [37.8746, 31.4932], // 3: Konya
+      [38.3687, 34.0370], // 4: Aksaray (yön için)
+      [38.7312, 35.4787], // 5: Kayseri (sadece geçiş)
+      [39.7477, 37.0179], // 6: Sivas
+      [39.7500, 39.5000], // 7: Erzincan (sadece geçiş)
+      [39.9208, 41.2675], // 8: Erzurum
+      [38.0800, 46.2919]  // 9: Tebriz
+    ];
+
+    // Segment tanımları (yeni eğrili yol için)
+    var curvedSegments = [
+      {start: 0, end: 1, curve: 0.2, points: 20}, // Alanya → Antalya
+      {start: 1, end: 2, curve: -0.1, points: 25},  // Antalya → Isparta-Beydişehir yönü
+      {start: 2, end: 3, curve: -0.4, points: 0},  // Isparta-Beydişehir → Konya (sağa dönüş)
+      {start: 3, end: 4, curve: 0.1, points: 15},  // Konya → Aksaray
+      {start: 4, end: 5, curve: -0.1, points: 15},  // Aksaray → Kayseri
+      {start: 5, end: 6, curve: 0.4, points: 15},  // Kayseri → Sivas
+      {start: 6, end: 7, curve: -0.2, points: 15},  // Sivas → Erzincan
+      {start: 7, end: 8, curve: 0.1, points: 15},  // Erzincan → Erzurum
+      {start: 8, end: 9, curve: -0.5, points: 25}  // Erzurum → Tebriz
+    ];
+
+    // Kıvrımlı yol noktalarını oluştur
+    var curvedRoutePoints = createAdvancedCurvedRoute(waypoints, curvedSegments);
+    
+    // Kıvrımlı yolu çiz
+    var curvedRoute = L.polyline(curvedRoutePoints, {
+      color: '#32CD32',
+      weight: 5,
+      opacity: 0.9,
+      dashArray: '15, 10',
+      className: 'alanya-tebriz-curved-route'
+    }).addTo(map);
+
+    // Yola tıklanabilirlik ekle
+    curvedRoute.bindPopup('<strong> Kervan Yolu</strong><br>XIII-XIV. yüzyıllarda Antalya Limanından yola çıkan kervanlar, (kervansarayların konumuna göre bu güzergah belirlenmiştir)Beyşehir, Konya ve Kayseri üzerinden Sivas\'a, oradan da Erzincan-Erzurum yoluyla Tebriz\'e ulaşmıştır. ');
+
+    // Ana şehirleri vurgulamak için renkli daireler ekle (Kayseri ve Erzincan hariç)
+    var mainRouteCities = [
+      {pos: waypoints[0], name: 'Alanya', color: '#FF6B6B'},       // Alanya
+      {pos: waypoints[1], name: 'Antalya', color: '#FF8E53'},      // Antalya
+      {pos: waypoints[3], name: 'Konya', color: '#4ECDC4'},        // Konya
+      {pos: waypoints[6], name: 'Sivas', color: '#45B7D1'},        // Sivas
+      {pos: waypoints[8], name: 'Erzurum', color: '#96CEB4'},      // Erzurum
+      {pos: waypoints[9], name: 'Tebriz', color: '#FFEAA7'}        // Tebriz
+    ];
+
+    mainRouteCities.forEach(function(city) {
+      L.circle(city.pos, {
+        color: city.color,
+        fillColor: city.color,
+        fillOpacity: 0.4,
+        radius: 12000
+      });//.addTo(map).bindTooltip(city.name + ' (Kıvrımlı Hat)', {permanent: false, direction: 'top'});
+    });
+
+    // Harita kontrolleri özelleştirme
+    map.attributionControl.setPrefix(' Tebriz\'e uzanan kervan yolu - Dijital Çizim');
+    
+    // Scroll göstergesi için event listener'lar
+    map.on('moveend zoomend', checkScrollIndicator);
+
+    // Pencere boyutu değiştiğinde haritayı yeniden ayarla
+    window.addEventListener('resize', function() {
+      var newIsMobile = window.innerWidth < 768;
+      var newMinZoom = newIsMobile ? 5.3 : 5.8;
+      var newMaxBounds = newIsMobile ? [
+        [28, 22],  // Mobil için genişletilmiş sınırlar
+        [56, 52]
+      ] : [
+        [28, 25],  // Masaüstü için orijinal sınırlar
+        [56, 48]
+      ];
+      
+      if (isMobile !== newIsMobile) {
+        map.setMinZoom(newMinZoom);
+        map.setMaxBounds(newMaxBounds);
+        isMobile = newIsMobile;
+        console.log('🔄 Ekran boyutu değişti, minZoom ve maxBounds güncellendi:', newMinZoom);
+      }
+
+      // Scroll göstergesini de kontrol et
+      checkScrollIndicator();
+    });
+
+    // Ok'a tıklama için event listener
+    document.getElementById('scroll-indicator').addEventListener('click', function() {
+      map.panBy([100, 0]); // Sağa doğru yavaşça kaydır
+
+    });
+
+    // İlk yüklemede scroll göstergesini kontrol et
+    checkScrollIndicator();
+  </script>
+</body>
+</html>
